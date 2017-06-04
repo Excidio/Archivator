@@ -14,19 +14,17 @@ namespace Archivator.ConsoleApp
             var bufferRead = new byte[SliceBytes];
 
             var noOfTasksF = (float)sourceStream.Length / SliceBytes;
-            var noOfTasksI = (int)sourceStream.Length / SliceBytes;
+            var noOfTasksI = sourceStream.Length / SliceBytes;
             float toComp = noOfTasksI;
             var tasks = toComp < noOfTasksF ? new Thread[sourceStream.Length / SliceBytes + 1] : new Thread[sourceStream.Length / SliceBytes];
 
             var taskCounter = 0;
-            int read;
-            var eventSignal = new AutoResetEvent(false);
-
-            while (0 != (read = sourceStream.Read(bufferRead, 0, SliceBytes)))
+            while (sourceStream.Read(bufferRead, 0, SliceBytes) != 0)
             {
-                tasks[taskCounter] = new Thread(() => CompressStream(bufferRead, read, taskCounter, ref listOfMemStream, eventSignal));
+                var read1 = bufferRead;
+                var counter = taskCounter;
+                tasks[taskCounter] = new Thread(() => CompressStream(read1, counter, ref listOfMemStream));
                 tasks[taskCounter].Start();
-                eventSignal.WaitOne(-1);
                 taskCounter++;
                 bufferRead = new byte[SliceBytes];
             }
@@ -45,12 +43,11 @@ namespace Archivator.ConsoleApp
             }
         }
 
-        private static void CompressStream(byte[] bytesToCompress, int length, int index, ref MemoryStream[] listOfMemStream, AutoResetEvent eventToSignal)
+        private static void CompressStream(byte[] bytesToCompress, int index, ref MemoryStream[] listOfMemStream)
         {
-            eventToSignal.Set();
-            MemoryStream stream = new MemoryStream();
-            GZipStream gzStream = new GZipStream(stream, CompressionMode.Compress, true);
-            gzStream.Write(bytesToCompress, 0, length);
+            var stream = new MemoryStream();
+            var gzStream = new GZipStream(stream, CompressionMode.Compress, true);
+            gzStream.Write(bytesToCompress, 0, bytesToCompress.Length);
             gzStream.Close();
 
             listOfMemStream[index] = stream;
