@@ -45,6 +45,7 @@
   <ItemGroup>
     <Compile Include="Archivator.cs" />
     <Compile Include="BoundedBuffer.cs" />
+    <Compile Include="Decompressor.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
