@@ -1,13 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
+﻿using System.Threading;
 
-namespace Archivator.ConsoleApp
+namespace Archivator.GzipArchivator
 {
-    public class BoundedBuffer<T>
+    internal class BoundedBuffer<T>
     {
         private readonly Semaphore _availableItems;
         private readonly Semaphore _availableSpaces;

@@ -5,15 +5,15 @@ using System.Net;
 using System.Text;
 using System.Threading;
 
-namespace Archivator.ConsoleApp
+namespace Archivator.GzipArchivator
 {
     public class Decompressor
     {
         private bool _isFinished;
         private int _totalChunks;
 
-        private readonly BoundedBuffer<byte[]> _toDecompress = new BoundedBuffer<byte[]>(100);
-        private readonly BoundedBuffer<byte[]> _toWrite = new BoundedBuffer<byte[]>(100);
+        private readonly BoundedBuffer<byte[]> _toDecompress = new BoundedBuffer<byte[]>(200);
+        private readonly BoundedBuffer<byte[]> _toWrite = new BoundedBuffer<byte[]>(200);
 
         public void Decompress(Stream targetStream, Stream sourceStream)
         {

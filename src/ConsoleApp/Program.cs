@@ -1,4 +1,5 @@
 ﻿using System.IO;
+using Archivator.GzipArchivator;
 
 namespace Archivator.ConsoleApp
 {
@@ -7,32 +8,25 @@ namespace Archivator.ConsoleApp
         public static void Main(string[] args)
         {
             FileStream sourceStream, targetStream;
-            //OpenFiles(@"D:\Test\1.gz", @"D:\Test\1.mkv", true, out targetStream, out sourceStream);
-            //new Compressor().Compress(targetStream, sourceStream);
+            OpenFiles(@"D:\Test\1.gz", @"D:\Test\1.mkv", out targetStream, out sourceStream);
+            new Compressor().Compress(targetStream, sourceStream);
 
-            OpenFiles(@"D:\Test\res.mkv", @"D:\Test\1.gz", true, out targetStream, out sourceStream);
-            new Decompressor().Decompress(targetStream, sourceStream);
+            //OpenFiles(@"D:\Test\res.mkv", @"D:\Test\1.gz", out targetStream, out sourceStream);
+            //new Decompressor().Decompress(targetStream, sourceStream);
 
             sourceStream.Close();
             targetStream.Close();
         }
-        private static void OpenFiles(string targetFileName, string sourceFileName, bool canOverWrite,
+        private static void OpenFiles(string targetFileName, string sourceFileName, 
             out FileStream targetFileStream, out FileStream sourceFileStream)
         {
             sourceFileStream = new FileStream(sourceFileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
 
-            if (canOverWrite)
+            try
             {
-                try
-                {
-                    targetFileStream = new FileStream(targetFileName, FileMode.Truncate);
-                }
-                catch (FileNotFoundException)
-                {
-                    targetFileStream = new FileStream(targetFileName, FileMode.CreateNew);
-                }
+                targetFileStream = new FileStream(targetFileName, FileMode.Truncate);
             }
-            else
+            catch (FileNotFoundException)
             {
                 targetFileStream = new FileStream(targetFileName, FileMode.CreateNew);
             }

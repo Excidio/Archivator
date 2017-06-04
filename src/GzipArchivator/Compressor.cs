@@ -3,7 +3,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Threading;
 
-namespace Archivator.ConsoleApp
+namespace Archivator.GzipArchivator
 {
     public class Compressor
     {
@@ -17,8 +17,8 @@ namespace Archivator.ConsoleApp
         private const int SliceBytes = 1048576;
 
         private int _fileSize;
-        private readonly BoundedBuffer<Chunk> _toCompress = new BoundedBuffer<Chunk>(100);
-        private readonly BoundedBuffer<Chunk> _toWrite = new BoundedBuffer<Chunk>(100);
+        private readonly BoundedBuffer<Chunk> _toCompress = new BoundedBuffer<Chunk>(200);
+        private readonly BoundedBuffer<Chunk> _toWrite = new BoundedBuffer<Chunk>(200);
 
         private void Read(Stream sourceStream)
         {
