@@ -7,10 +7,10 @@ namespace Archivator.ConsoleApp
         public static void Main(string[] args)
         {
             FileStream sourceStream, targetStream;
-            //OpenFiles(@"D:\Test\2.gz", @"D:\Test\2.avi", true, out targetStream, out sourceStream);
-            //new Archivator().Compress(targetStream, sourceStream);
+            //OpenFiles(@"D:\Test\1.gz", @"D:\Test\1.mkv", true, out targetStream, out sourceStream);
+            //new Compressor().Compress(targetStream, sourceStream);
 
-            OpenFiles(@"D:\Test\res.avi", @"D:\Test\2.gz", true, out targetStream, out sourceStream);
+            OpenFiles(@"D:\Test\res.mkv", @"D:\Test\1.gz", true, out targetStream, out sourceStream);
             new Decompressor().Decompress(targetStream, sourceStream);
 
             sourceStream.Close();

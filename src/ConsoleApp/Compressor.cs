@@ -1,20 +1,19 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Threading;
 
 namespace Archivator.ConsoleApp
 {
-    public class Chunk
+    public class Compressor
     {
-        public byte[] Data { get; set; }
+        private class Chunk
+        {
+            public byte[] Data { get; set; }
 
-        public int Length { get; set; }
-    }
+            public int Length { get; set; }
+        }
 
-    public class Archivator
-    {
         private const int SliceBytes = 1048576;
 
         private int _fileSize;
@@ -27,7 +26,7 @@ namespace Archivator.ConsoleApp
             int read;
             while ((read = sourceStream.Read(bufferRead, 0, SliceBytes)) != 0)
             {
-                _toCompress.Add(new Chunk {Data = bufferRead, Length = read});
+                _toCompress.Add(new Chunk { Data = bufferRead, Length = read });
                 bufferRead = new byte[SliceBytes];
             }
         }
@@ -45,7 +44,7 @@ namespace Archivator.ConsoleApp
                 gzStream.Close();
 
                 var data = stream.ToArray();
-                _toWrite.Add(new Chunk {Data = data, Length = data.Length});
+                _toWrite.Add(new Chunk { Data = data, Length = data.Length });
                 stream.Close();
             }
         }
@@ -57,8 +56,7 @@ namespace Archivator.ConsoleApp
             {
                 var chunk = _toWrite.Take();
 
-                byte[] lengthToStore = GetBytesToStore(chunk.Data.Length);
-
+                var lengthToStore = GetBytesToStore(chunk.Data.Length);
                 targetStream.Write(lengthToStore, 0, lengthToStore.Length);
 
                 targetStream.Write(chunk.Data, 0, chunk.Length);
@@ -84,10 +82,10 @@ namespace Archivator.ConsoleApp
 
         private static byte[] GetBytesToStore(int length)
         {
-            int lengthToStore = System.Net.IPAddress.HostToNetworkOrder(length);
-            byte[] lengthInBytes = BitConverter.GetBytes(lengthToStore);
-            string base64Enc = Convert.ToBase64String(lengthInBytes);
-            byte[] finalStore = System.Text.Encoding.ASCII.GetBytes(base64Enc);
+            var lengthToStore = System.Net.IPAddress.HostToNetworkOrder(length);
+            var lengthInBytes = BitConverter.GetBytes(lengthToStore);
+            var base64Enc = Convert.ToBase64String(lengthInBytes);
+            var finalStore = System.Text.Encoding.ASCII.GetBytes(base64Enc);
 
             return finalStore;
         }
