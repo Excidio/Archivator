@@ -2,56 +2,137 @@
 using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
+using System.Linq;
 using System.Threading;
 
 namespace Archivator.ConsoleApp
 {
+    public class Chunk
+    {
+        public byte[] Data { get; set; }
+
+        public int Length { get; set; }
+    }
+
     public class Archivator
     {
         private const int SliceBytes = 1048576;
 
-        public void Compress(Stream targetStream, Stream sourceStream)
+        private int _fileSize;
+        private readonly BoundedBuffer<Chunk> _toCompress = new BoundedBuffer<Chunk>(100);
+        private readonly BoundedBuffer<Chunk> _toWrite = new BoundedBuffer<Chunk>(100);
+
+        private void Read(Stream sourceStream)
         {
-            var listOfMemStream = new MemoryStream[(int)(sourceStream.Length / SliceBytes + 1)];
             var bufferRead = new byte[SliceBytes];
-
-            var noOfTasksF = (float)sourceStream.Length / SliceBytes;
-            var noOfTasksI = sourceStream.Length / SliceBytes;
-            float toComp = noOfTasksI;
-            var tasks = toComp < noOfTasksF ? new Thread[sourceStream.Length / SliceBytes + 1] : new Thread[sourceStream.Length / SliceBytes];
-
-            var taskCounter = 0;
-            var read = 0;
+            int read;
             while ((read = sourceStream.Read(bufferRead, 0, SliceBytes)) != 0)
             {
-                var read1 = bufferRead;
-                var read2 = read;
-                var counter = taskCounter;
-                tasks[taskCounter] = new Thread(() => CompressStream(read1, read2, counter, ref listOfMemStream));
-                tasks[taskCounter].Start();
-                taskCounter++;
+                _toCompress.Add(new Chunk {Data = bufferRead, Length = read});
                 bufferRead = new byte[SliceBytes];
             }
+        }
 
-            foreach (var t in tasks)
+        private void Compress()
+        {
+            var processedChunks = 0;
+            while (processedChunks++ < _fileSize)
             {
-                t.Join();
+                var chunk = _toCompress.Take();
+
+                var stream = new MemoryStream();
+                var gzStream = new GZipStream(stream, CompressionMode.Compress, true);
+                gzStream.Write(chunk.Data, 0, chunk.Length);
+                gzStream.Close();
+
+                var data = stream.ToArray();
+                _toWrite.Add(new Chunk {Data = data, Length = data.Length});
+                stream.Close();
             }
+        }
 
-            for (var i = 0; i < tasks.Length; i++)
+        private void Write(Stream targetStream)
+        {
+            var processedChunks = 0;
+            while (processedChunks++ < _fileSize)
             {
-                byte[] lengthToStore = GetBytesToStore((int)listOfMemStream[i].Length);
+                var chunk = _toWrite.Take();
+
+                byte[] lengthToStore = GetBytesToStore(chunk.Data.Length);
 
                 targetStream.Write(lengthToStore, 0, lengthToStore.Length);
 
-                var compressedBytes = listOfMemStream[i].ToArray();
-                listOfMemStream[i].Close();
-                listOfMemStream[i] = null;
-                targetStream.Write(compressedBytes, 0, compressedBytes.Length);
+                targetStream.Write(chunk.Data, 0, chunk.Length);
             }
 
-            sourceStream.Close();
-            targetStream.Close();
+            //for (var i = 0; i < tasks.Length; i++)
+            //{
+            //    byte[] lengthToStore = GetBytesToStore((int)listOfMemStream[i].Length);
+
+            //    targetStream.Write(lengthToStore, 0, lengthToStore.Length);
+
+            //    var compressedBytes = listOfMemStream[i].ToArray();
+            //    listOfMemStream[i].Close();
+            //    listOfMemStream[i] = null;
+            //    targetStream.Write(compressedBytes, 0, compressedBytes.Length);
+            //}
+        }
+
+
+        private MemoryStream[] listOfMemStream;
+        public void Compress(Stream targetStream, Stream sourceStream)
+        {
+            _fileSize = (int)(sourceStream.Length / SliceBytes + 1);
+            //listOfMemStream = new MemoryStream[(int)(sourceStream.Length / SliceBytes + 1)];
+            //var bufferRead = new byte[SliceBytes];
+
+            //var noOfTasksF = (float)sourceStream.Length / SliceBytes;
+            //var noOfTasksI = sourceStream.Length / SliceBytes;
+            //float toComp = noOfTasksI;
+            //var tasks = toComp < noOfTasksF ? new Thread[sourceStream.Length / SliceBytes + 1] : new Thread[sourceStream.Length / SliceBytes];
+
+            //var taskCounter = 0;
+            //var read = 0;
+
+            var readThread = new Thread(() => Read(sourceStream));
+            var compressThread = new Thread(Compress);
+            var writeThread = new Thread(() => Write(targetStream));
+
+            readThread.Start();
+            compressThread.Start();
+            writeThread.Start();
+
+            readThread.Join();
+            compressThread.Join();
+            writeThread.Join();
+
+            //while ((read = sourceStream.Read(bufferRead, 0, SliceBytes)) != 0)
+            //{
+            //    var read1 = bufferRead;
+            //    var read2 = read;
+            //    var counter = taskCounter;
+            //    tasks[taskCounter] = new Thread(() => CompressStream(read1, read2, counter, ref listOfMemStream));
+            //    tasks[taskCounter].Start();
+            //    taskCounter++;
+            //    bufferRead = new byte[SliceBytes];
+            //}
+
+            //foreach (var t in tasks)
+            //{
+            //    t.Join();
+            //}
+
+            //for (var i = 0; i < tasks.Length; i++)
+            //{
+            //    byte[] lengthToStore = GetBytesToStore((int)listOfMemStream[i].Length);
+
+            //    targetStream.Write(lengthToStore, 0, lengthToStore.Length);
+
+            //    var compressedBytes = listOfMemStream[i].ToArray();
+            //    listOfMemStream[i].Close();
+            //    listOfMemStream[i] = null;
+            //    targetStream.Write(compressedBytes, 0, compressedBytes.Length);
+            //}
         }
 
         //public void Decompress(FileStream targetStream, FileStream sourceStream)
@@ -141,8 +222,6 @@ namespace Archivator.ConsoleApp
                 targetStream.Write(buffToWrite, 0, length);
 
             }
-
-
         }
 
         private static void UnCompressP(byte[] buffToUnCompress, int index, AutoResetEvent eventToTrigger, ref MemoryStream[] memStream)
