@@ -1,4 +1,6 @@
 ﻿using System.IO;
+using System.IO.Compression;
+using System.Threading;
 
 namespace Archivator.ConsoleApp
 {
@@ -7,13 +9,12 @@ namespace Archivator.ConsoleApp
         public static void Main(string[] args)
         {
             FileStream sourceStream, targetStream;
-            OpenFiles(@"D:\Test\1.gz", @"D:\Test\1.mkv", true, out targetStream, out sourceStream);
-            new Archivator().Compress(targetStream, sourceStream);
+            //OpenFiles(@"D:\Test\2.gz", @"D:\Test\2.avi", true, out targetStream, out sourceStream);
+            //new Archivator().Compress(targetStream, sourceStream);
 
-            sourceStream.Close();
-            targetStream.Close();
+            OpenFiles(@"D:\Test\res.avi", @"D:\Test\2.gz", true, out targetStream, out sourceStream);
+            new Archivator().Decompress(targetStream, sourceStream);
         }
-
         private static void OpenFiles(string targetFileName, string sourceFileName, bool canOverWrite,
             out FileStream targetFileStream, out FileStream sourceFileStream)
         {
