@@ -8,7 +8,7 @@
     <OutputType>Exe</OutputType>
     <RootNamespace>Archivator.ConsoleApp</RootNamespace>
     <AssemblyName>Archivator.ConsoleApp</AssemblyName>
-    <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <TargetFrameworkProfile />

@@ -22,7 +22,7 @@ namespace Archivator.GzipArchivator
             _availableSpaces.WaitOne();
             lock (_items)
             {
-                int i = _putPosition;
+                var i = _putPosition;
                 _items[i] = item;
                 _putPosition = (++i == _items.Length) ? 0 : i;
             }
@@ -35,7 +35,7 @@ namespace Archivator.GzipArchivator
             T item;
             lock (_items)
             {
-                int i = _takePosition;
+                var i = _takePosition;
                 item = _items[i];
                 _items[i] = default(T);
                 _takePosition = (++i == _items.Length) ? 0 : i;

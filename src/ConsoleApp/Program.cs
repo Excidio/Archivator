@@ -8,17 +8,17 @@ namespace Archivator.ConsoleApp
         public static void Main(string[] args)
         {
             FileStream sourceStream, targetStream;
-            OpenFiles(@"D:\Test\1.gz", @"D:\Test\1.mkv", out targetStream, out sourceStream);
-            new Compressor().Compress(targetStream, sourceStream);
+            //OpenFiles(@"D:\Test\1.gz", @"D:\Test\1.mkv", out targetStream, out sourceStream);
+            //new Compressor().Compress(targetStream, sourceStream);
 
-            //OpenFiles(@"D:\Test\res.mkv", @"D:\Test\1.gz", out targetStream, out sourceStream);
-            //new Decompressor().Decompress(targetStream, sourceStream);
+            OpenFiles(@"D:\Test\res.mkv", @"D:\Test\1.gz", out targetStream, out sourceStream);
+            new Decompressor().Decompress(targetStream, sourceStream);
 
             sourceStream.Close();
             targetStream.Close();
         }
-        private static void OpenFiles(string targetFileName, string sourceFileName, 
-            out FileStream targetFileStream, out FileStream sourceFileStream)
+        private static void OpenFiles(string sourceFileName, string targetFileName,
+            out FileStream sourceFileStream, out FileStream targetFileStream)
         {
             sourceFileStream = new FileStream(sourceFileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
 

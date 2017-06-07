@@ -16,9 +16,26 @@ namespace Archivator.GzipArchivator
 
         private const int SliceBytes = 1048576;
 
-        private int _fileSize;
-        private readonly BoundedBuffer<Chunk> _toCompress = new BoundedBuffer<Chunk>(200);
-        private readonly BoundedBuffer<Chunk> _toWrite = new BoundedBuffer<Chunk>(200);
+        private readonly BoundedBuffer<Chunk> _toCompress = new BoundedBuffer<Chunk>(100);
+        private readonly BoundedBuffer<Chunk> _toWrite = new BoundedBuffer<Chunk>(100);
+
+        private bool _isFinished;
+        private int _totalChunks;
+
+        public void Compress(Stream sourceStream, Stream destinationStream)
+        {
+            var readThread = new Thread(() => Read(sourceStream));
+            var compressThread = new Thread(Compress);
+            var writeThread = new Thread(() => Write(destinationStream));
+
+            readThread.Start();
+            compressThread.Start();
+            writeThread.Start();
+
+            readThread.Join();
+            compressThread.Join();
+            writeThread.Join();
+        }
 
         private void Read(Stream sourceStream)
         {
@@ -28,56 +45,54 @@ namespace Archivator.GzipArchivator
             {
                 _toCompress.Add(new Chunk { Data = bufferRead, Length = read });
                 bufferRead = new byte[SliceBytes];
+                _totalChunks++;
             }
+
+            _isFinished = true;
         }
 
         private void Compress()
         {
             var processedChunks = 0;
-            while (processedChunks++ < _fileSize)
+            while (!_isFinished || processedChunks < _totalChunks)
             {
                 var chunk = _toCompress.Take();
 
-                var stream = new MemoryStream();
-                var gzStream = new GZipStream(stream, CompressionMode.Compress, true);
-                gzStream.Write(chunk.Data, 0, chunk.Length);
-                gzStream.Close();
+                MemoryStream memoryStream = null;
+                try
+                {
+                    memoryStream = new MemoryStream();
+                    using (var gzStream = new GZipStream(memoryStream, CompressionMode.Compress, true))
+                    {
+                        gzStream.Write(chunk.Data, 0, chunk.Length);
+                    }
 
-                var data = stream.ToArray();
-                _toWrite.Add(new Chunk { Data = data, Length = data.Length });
-                stream.Close();
+                    var data = memoryStream.ToArray();
+                    _toWrite.Add(new Chunk { Data = data, Length = data.Length });
+                }
+                finally
+                {
+                    memoryStream?.Dispose();
+                }
+
+                processedChunks++;
             }
         }
 
-        private void Write(Stream targetStream)
+        private void Write(Stream destinationStream)
         {
             var processedChunks = 0;
-            while (processedChunks++ < _fileSize)
+            while (!_isFinished || processedChunks < _totalChunks)
             {
                 var chunk = _toWrite.Take();
 
                 var lengthToStore = GetBytesToStore(chunk.Data.Length);
-                targetStream.Write(lengthToStore, 0, lengthToStore.Length);
+                destinationStream.Write(lengthToStore, 0, lengthToStore.Length);
 
-                targetStream.Write(chunk.Data, 0, chunk.Length);
+                destinationStream.Write(chunk.Data, 0, chunk.Length);
+
+                processedChunks++;
             }
-        }
-
-        public void Compress(Stream targetStream, Stream sourceStream)
-        {
-            _fileSize = (int)(sourceStream.Length / SliceBytes + 1);
-
-            var readThread = new Thread(() => Read(sourceStream));
-            var compressThread = new Thread(Compress);
-            var writeThread = new Thread(() => Write(targetStream));
-
-            readThread.Start();
-            compressThread.Start();
-            writeThread.Start();
-
-            readThread.Join();
-            compressThread.Join();
-            writeThread.Join();
         }
 
         private static byte[] GetBytesToStore(int length)
