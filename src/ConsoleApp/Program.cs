@@ -52,7 +52,7 @@ namespace Archivator.ConsoleApp
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine("Unexcpected error: {0}. Please contact with developer!", ex);
+                    Console.WriteLine("Unexpected error: {0}. Please contact with developer!", ex);
                 }
                 finally
                 {

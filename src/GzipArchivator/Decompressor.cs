@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Net;
@@ -12,8 +13,10 @@ namespace Archivator.GzipArchivator
         private bool _isFinished;
         private int _totalChunks;
 
-        private readonly BoundedBuffer<byte[]> _toDecompress = new BoundedBuffer<byte[]>(100);
-        private readonly BoundedBuffer<byte[]> _toWrite = new BoundedBuffer<byte[]>(100);
+        private const int ChunkBlocksCount = 64;
+
+        private readonly BoundedBuffer<byte[]> _toDecompress = new BoundedBuffer<byte[]>(500);
+        private readonly BoundedBuffer<byte[]> _toWrite = new BoundedBuffer<byte[]>(500);
 
         public void Decompress(Stream sourceStream, Stream destinationStream)
         {
@@ -54,26 +57,55 @@ namespace Archivator.GzipArchivator
         private void Decompress()
         {
             var processedChunks = 0;
+            var index = 0;
+
+            var decompressedChunks = new byte[ChunkBlocksCount][];
+            var waitHandles = new List<WaitHandle>(ChunkBlocksCount);
+
+
             while (!_isFinished || processedChunks < _totalChunks)
             {
-                var dataToDecompress = _toDecompress.Take();
+                var compressedChunk = _toDecompress.Take();
+                var handle = new ManualResetEvent(false);
+                var i = index;
 
-                using (var cmpStream = new MemoryStream(dataToDecompress))
-                using (var decomprStream = new GZipStream(cmpStream, CompressionMode.Decompress, true))
-                using (var msToAssign = new MemoryStream())
+                new Thread(() => Decompress(compressedChunk, decompressedChunks, i, handle)).Start();
+
+                waitHandles.Add(handle);
+                index++;
+                processedChunks++;
+
+                if (index == ChunkBlocksCount || (_isFinished && processedChunks == _totalChunks))
                 {
-                    var unCompressedBuffer = new byte[dataToDecompress.Length];
-                    int read;
-                    while ((read = decomprStream.Read(unCompressedBuffer, 0, dataToDecompress.Length)) > 0)
+                    WaitHandle.WaitAll(waitHandles.ToArray());
+                    foreach (var decompressedChunk in decompressedChunks)
                     {
-                        msToAssign.Write(unCompressedBuffer, 0, read);
+                        _toWrite.Add(decompressedChunk);
                     }
+                    index = 0;
 
-                    _toWrite.Add(msToAssign.ToArray());
+                    waitHandles = new List<WaitHandle>(ChunkBlocksCount);
+                }
+            }
+        }
+
+        private static void Decompress(byte[] compressedChunk, IList<byte[]> decompressedChunks, int index, EventWaitHandle handle)
+        {
+            using (var cmpStream = new MemoryStream(compressedChunk))
+            using (var decomprStream = new GZipStream(cmpStream, CompressionMode.Decompress, true))
+            using (var msToAssign = new MemoryStream())
+            {
+                var unCompressedBuffer = new byte[compressedChunk.Length];
+                int read;
+                while ((read = decomprStream.Read(unCompressedBuffer, 0, compressedChunk.Length)) > 0)
+                {
+                    msToAssign.Write(unCompressedBuffer, 0, read);
                 }
 
-                processedChunks++;
+                decompressedChunks[index] = msToAssign.ToArray();
             }
+
+            handle.Set();
         }
 
         private void Write(Stream destinationStream)

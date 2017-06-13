@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Threading;
@@ -14,16 +15,18 @@ namespace Archivator.GzipArchivator
             public int Length { get; set; }
         }
 
+        private const int ChunkBlocksCount = 64;
         private const int SliceBytes = 1048576;
 
-        private readonly BoundedBuffer<Chunk> _toCompress = new BoundedBuffer<Chunk>(100);
-        private readonly BoundedBuffer<Chunk> _toWrite = new BoundedBuffer<Chunk>(100);
+        private readonly BoundedBuffer<Chunk> _toCompress = new BoundedBuffer<Chunk>(500);
+        private readonly BoundedBuffer<Chunk> _toWrite = new BoundedBuffer<Chunk>(500);
 
-        private bool _isFinished;
         private int _totalChunks;
 
         public void Compress(Stream sourceStream, Stream destinationStream)
         {
+            _totalChunks = (int)Math.Ceiling(sourceStream.Length / (double)SliceBytes);
+
             var readThread = new Thread(() => Read(sourceStream));
             var compressThread = new Thread(Compress);
             var writeThread = new Thread(() => Write(destinationStream));
@@ -45,50 +48,72 @@ namespace Archivator.GzipArchivator
             {
                 _toCompress.Add(new Chunk { Data = bufferRead, Length = read });
                 bufferRead = new byte[SliceBytes];
-                _totalChunks++;
             }
-
-            _isFinished = true;
         }
 
         private void Compress()
         {
             var processedChunks = 0;
-            while (!_isFinished || processedChunks < _totalChunks)
+            var index = 0;
+
+            var compressedChunks = new Chunk[ChunkBlocksCount];
+            var waitHandles = new WaitHandle[ChunkBlocksCount];
+
+            while (processedChunks < _totalChunks)
             {
-                var chunk = _toCompress.Take();
+                var originalChunck = _toCompress.Take();
+                var handle = new ManualResetEvent(false);
+                var i = index;
 
-                MemoryStream memoryStream = null;
-                try
-                {
-                    memoryStream = new MemoryStream();
-                    using (var gzStream = new GZipStream(memoryStream, CompressionMode.Compress, true))
-                    {
-                        gzStream.Write(chunk.Data, 0, chunk.Length);
-                    }
+                new Thread(() => Compress(originalChunck, compressedChunks, i, handle)).Start();
 
-                    var data = memoryStream.ToArray();
-                    _toWrite.Add(new Chunk { Data = data, Length = data.Length });
-                }
-                finally
-                {
-                    memoryStream?.Dispose();
-                }
-
+                waitHandles[index++] = handle;
                 processedChunks++;
+
+                if (index == ChunkBlocksCount || processedChunks == _totalChunks)
+                {
+                    WaitHandle.WaitAll(waitHandles);
+                    foreach (var compressedChunk in compressedChunks)
+                    {
+                        _toWrite.Add(compressedChunk);
+                    }
+                    index = 0;
+                    waitHandles = new WaitHandle[Math.Min(ChunkBlocksCount, _totalChunks - processedChunks)];
+                }
             }
+        }
+
+        private static void Compress(Chunk originalChunck, IList<Chunk> compressedChunks, int index, EventWaitHandle handle)
+        {
+            MemoryStream memoryStream = null;
+            try
+            {
+                memoryStream = new MemoryStream();
+                using (var gzStream = new GZipStream(memoryStream, CompressionMode.Compress, true))
+                {
+                    gzStream.Write(originalChunck.Data, 0, originalChunck.Length);
+                }
+
+                var data = memoryStream.ToArray();
+                compressedChunks[index] = new Chunk { Data = data, Length = data.Length };
+            }
+            finally
+            {
+                memoryStream?.Dispose();
+            }
+
+            handle.Set();
         }
 
         private void Write(Stream destinationStream)
         {
             var processedChunks = 0;
-            while (!_isFinished || processedChunks < _totalChunks)
+            while (processedChunks < _totalChunks)
             {
                 var chunk = _toWrite.Take();
 
                 var lengthToStore = GetBytesToStore(chunk.Data.Length);
                 destinationStream.Write(lengthToStore, 0, lengthToStore.Length);
-
                 destinationStream.Write(chunk.Data, 0, chunk.Length);
 
                 processedChunks++;
