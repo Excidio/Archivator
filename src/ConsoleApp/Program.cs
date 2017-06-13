@@ -1,7 +1,7 @@
 ﻿using System;
 using System.IO;
+using Archivator.ConsoleApp.CommandLineOptions;
 using Archivator.GzipArchivator;
-using CommandLine;
 
 namespace Archivator.ConsoleApp
 {
@@ -9,33 +9,25 @@ namespace Archivator.ConsoleApp
     {
         public static void Main(string[] args)
         {
-            var options = new CommandLineOptions();
-            var parser = new Parser(s =>
-            {
-                s.CaseSensitive = false;
-                s.IgnoreUnknownArguments = false;
-                s.MutuallyExclusive = true;
-            });
-
-            if (parser.ParseArguments(args, options))
+            var parameters = GetParameters(args);
+            if (parameters != null)
             {
                 FileStream sourceStream = null, targetStream = null;
-
                 try
                 {
-                    OpenFiles(options.SourceFileName, options.ResultFileName, out sourceStream, out targetStream);
+                    OpenFiles(parameters.SourceFileName, parameters.DestinationFileName, out sourceStream, out targetStream);
 
-                    if (options.IsCompress)
+                    switch (parameters.ArchivatorAction)
                     {
-                        new Compressor().Compress(sourceStream, targetStream);
-                    }
-                    else if (options.IsDecompress)
-                    {
-                        new Decompressor().Decompress(sourceStream, targetStream);
-                    }
-                    else
-                    {
-                        Console.WriteLine("You must select action: -c(compress) or -d(decompress)!");
+                        case ArchivatorAction.compress:
+                            new Compressor().Compress(sourceStream, targetStream);
+                            break;
+                        case ArchivatorAction.decompress:
+                            new Decompressor().Decompress(sourceStream, targetStream);
+                            break;
+                        default:
+                            Console.WriteLine("Wrong action selected!");
+                            break;
                     }
                 }
                 catch (DirectoryNotFoundException)
@@ -60,12 +52,27 @@ namespace Archivator.ConsoleApp
                     targetStream?.Close();
                 }
             }
-            else
-            {
-                Console.WriteLine(options.GetUsage());
-                Console.ReadKey();
-            }
         }
+
+        private static CommandLineParameters GetParameters(string[] args)
+        {
+            CommandLineParameters parameters = null;
+            try
+            {
+                parameters = new CommandLineParser().Parse(args);
+            }
+            catch (ApplicationException ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+            catch (ArgumentException ex)
+            {
+                Console.WriteLine(ex.Message);
+            }
+
+            return parameters;
+        }
+
         private static void OpenFiles(string sourceFileName, string targetFileName,
             out FileStream sourceFileStream, out FileStream targetFileStream)
         {
